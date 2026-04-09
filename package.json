@@ -1,0 +1,30 @@
+{
+  "name": "db-tool",
+  "version": "1.0.0",
+  "description": "Online database tool for executing DDL and DML statements",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "nodemon server/index.js",
+    "client": "cd client && npm run dev",
+    "build": "cd client && npm install && npm run build",
+    "start": "node server/index.js",
+    "railway:build": "npm install && cd client && npm install && npm run build"
+  },
+  "keywords": ["database", "sql", "ddl", "dml"],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.x"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "better-sqlite3": "^9.2.2",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "concurrently": "^8.2.2"
+  }
+}
