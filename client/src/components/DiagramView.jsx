@@ -16,8 +16,15 @@ function DiagramView({ tables, dbId }) {
   }, [dbId, tables])
 
   useEffect(() => {
-    if (tables && tables.length > 0 && !Object.keys(tablePositions).length) {
-      initializeTablePositions()
+    if (tables && tables.length > 0) {
+      // Check if we have new tables that aren't positioned yet
+      const currentTableNames = Object.keys(tablePositions)
+      const newTableNames = tables.map(t => t.name)
+      const hasNewTables = newTableNames.some(name => !currentTableNames.includes(name))
+      
+      if (currentTableNames.length === 0 || hasNewTables) {
+        initializeTablePositions()
+      }
     }
   }, [tables])
 

@@ -111,7 +111,11 @@ function App() {
       setQueryResult(response.data)
       setSuccess(response.data.message)
       setTimeout(() => setSuccess(null), 3000)
-      fetchTablesWithSchema()
+      
+      // Wait a bit and refresh tables to show new/updated tables
+      setTimeout(async () => {
+        await fetchTablesWithSchema()
+      }, 100)
     } catch (err) {
       setError(err.response?.data?.error || 'Error al ejecutar la consulta')
       setQueryResult(null)
@@ -132,7 +136,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <div className="container mx-auto px-4 py-8">
+      <div className="w-[95%] mx-auto py-8">
         <header className="mb-8">
           <div className="flex items-center justify-between">
             <div>
@@ -170,8 +174,8 @@ function App() {
           </div>
         )}
 
-        <div className={`grid gap-6 ${viewMode === 'diagram' && selectedDb ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-4'}`}>
-          <div className={`space-y-6 ${viewMode === 'diagram' && selectedDb ? 'hidden' : 'lg:col-span-1'}`}>
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-6">
+          <div className="space-y-6 lg:col-span-1">
             <div className="bg-white/10 backdrop-blur-lg rounded-lg p-6 border border-white/20">
               <h2 className="text-xl font-semibold text-white mb-4">Crear base de datos</h2>
               <form onSubmit={createDatabase} className="space-y-3">
@@ -229,7 +233,7 @@ function App() {
             </div>
           </div>
 
-          <div className={`space-y-6 ${viewMode === 'diagram' && selectedDb ? 'col-span-1' : 'lg:col-span-3'}`}>
+          <div className="space-y-6 lg:col-span-5">
             {!selectedDb ? (
               <div className="bg-white/10 backdrop-blur-lg rounded-lg p-12 border border-white/20 text-center">
                 <Database className="w-20 h-20 mx-auto mb-4 text-purple-400 opacity-50" />
@@ -302,10 +306,7 @@ function App() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="relative border-2 border-slate-700 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
-                        <div className="absolute top-3 left-3 text-xs text-slate-500 font-mono opacity-70 pointer-events-none z-10">
-                          SQL Editor
-                        </div>
+                      <div className="border-2 border-slate-700 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
                         <CodeMirror
                           value={sqlQuery}
                           height="300px"
