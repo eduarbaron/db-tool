@@ -300,17 +300,18 @@ function App() {
                   ) : (
                     <div className="space-y-4">
                       <div className="relative">
-                        <div className="absolute top-3 left-3 text-xs text-purple-400 font-mono opacity-50 pointer-events-none">
+                        <div className="absolute top-3 left-3 text-xs text-slate-500 font-mono opacity-70 pointer-events-none">
                           SQL Editor
                         </div>
                         <textarea
                           value={sqlQuery}
                           onChange={(e) => setSqlQuery(e.target.value)}
                           placeholder="Escribe tu consulta SQL aquí...&#10;&#10;Ejemplos:&#10;CREATE TABLE usuarios (id INTEGER PRIMARY KEY, nombre TEXT, email TEXT);&#10;INSERT INTO usuarios (nombre, email) VALUES ('Juan', 'juan@example.com');&#10;SELECT * FROM usuarios;"
-                          className="w-full h-64 px-4 py-3 pt-8 bg-slate-950 border-2 border-purple-500/30 rounded-lg text-green-300 font-mono text-base placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none leading-relaxed tracking-wide"
+                          className="w-full h-64 px-4 py-3 pt-8 bg-[#1e1e1e] border-2 border-slate-700 rounded-lg text-slate-200 font-mono text-base placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none leading-relaxed shadow-inner"
                           style={{
                             fontFamily: "'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace",
-                            tabSize: 2
+                            tabSize: 2,
+                            letterSpacing: '0.5px'
                           }}
                         />
                       </div>
