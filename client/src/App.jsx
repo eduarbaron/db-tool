@@ -19,7 +19,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
-  const [mode, setMode] = useState('visual')
+  const [mode, setMode] = useState('sql')
   const [builderType, setBuilderType] = useState('DDL')
   const [viewMode, setViewMode] = useState('cards')
   const [showAdminPanel, setShowAdminPanel] = useState(false)
@@ -299,12 +299,21 @@ function App() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <textarea
-                        value={sqlQuery}
-                        onChange={(e) => setSqlQuery(e.target.value)}
-                        placeholder="Escribe tu consulta SQL aquí...&#10;&#10;Ejemplos:&#10;CREATE TABLE usuarios (id INTEGER PRIMARY KEY, nombre TEXT, email TEXT);&#10;INSERT INTO usuarios (nombre, email) VALUES ('Juan', 'juan@example.com');&#10;SELECT * FROM usuarios;"
-                        className="w-full h-48 px-4 py-3 bg-slate-900/50 border border-white/30 rounded-lg text-white font-mono text-sm placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                      />
+                      <div className="relative">
+                        <div className="absolute top-3 left-3 text-xs text-purple-400 font-mono opacity-50 pointer-events-none">
+                          SQL Editor
+                        </div>
+                        <textarea
+                          value={sqlQuery}
+                          onChange={(e) => setSqlQuery(e.target.value)}
+                          placeholder="Escribe tu consulta SQL aquí...&#10;&#10;Ejemplos:&#10;CREATE TABLE usuarios (id INTEGER PRIMARY KEY, nombre TEXT, email TEXT);&#10;INSERT INTO usuarios (nombre, email) VALUES ('Juan', 'juan@example.com');&#10;SELECT * FROM usuarios;"
+                          className="w-full h-64 px-4 py-3 pt-8 bg-slate-950 border-2 border-purple-500/30 rounded-lg text-green-300 font-mono text-base placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none leading-relaxed tracking-wide"
+                          style={{
+                            fontFamily: "'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace",
+                            tabSize: 2
+                          }}
+                        />
+                      </div>
                       <button
                         onClick={executeQuery}
                         disabled={loading || !sqlQuery.trim()}
