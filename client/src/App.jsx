@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { Database, Play, Trash2, Plus, AlertCircle, CheckCircle, Loader, Code, Wand2, LayoutGrid, Network, Shield } from 'lucide-react'
+import CodeMirror from '@uiw/react-codemirror'
+import { sql } from '@codemirror/lang-sql'
+import { oneDark } from '@codemirror/theme-one-dark'
 import TableVisualizer from './components/TableVisualizer'
 import DDLBuilder from './components/DDLBuilder'
 import DMLBuilder from './components/DMLBuilder'
@@ -299,19 +302,47 @@ function App() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="relative">
-                        <div className="absolute top-3 left-3 text-xs text-slate-500 font-mono opacity-70 pointer-events-none">
+                      <div className="relative border-2 border-slate-700 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
+                        <div className="absolute top-3 left-3 text-xs text-slate-500 font-mono opacity-70 pointer-events-none z-10">
                           SQL Editor
                         </div>
-                        <textarea
+                        <CodeMirror
                           value={sqlQuery}
-                          onChange={(e) => setSqlQuery(e.target.value)}
-                          placeholder="Escribe tu consulta SQL aquí...&#10;&#10;Ejemplos:&#10;CREATE TABLE usuarios (id INTEGER PRIMARY KEY, nombre TEXT, email TEXT);&#10;INSERT INTO usuarios (nombre, email) VALUES ('Juan', 'juan@example.com');&#10;SELECT * FROM usuarios;"
-                          className="w-full h-64 px-4 py-3 pt-8 bg-[#1e1e1e] border-2 border-slate-700 rounded-lg text-slate-200 font-mono text-base placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none leading-relaxed shadow-inner"
+                          height="300px"
+                          theme={oneDark}
+                          extensions={[sql()]}
+                          onChange={(value) => setSqlQuery(value)}
+                          placeholder="Escribe tu consulta SQL aquí...
+
+Ejemplos:
+CREATE TABLE usuarios (id INTEGER PRIMARY KEY, nombre TEXT, email TEXT);
+INSERT INTO usuarios (nombre, email) VALUES ('Juan', 'juan@example.com');
+SELECT * FROM usuarios;"
+                          basicSetup={{
+                            lineNumbers: true,
+                            highlightActiveLineGutter: true,
+                            highlightSpecialChars: true,
+                            foldGutter: true,
+                            drawSelection: true,
+                            dropCursor: true,
+                            allowMultipleSelections: true,
+                            indentOnInput: true,
+                            bracketMatching: true,
+                            closeBrackets: true,
+                            autocompletion: true,
+                            rectangularSelection: true,
+                            crosshairCursor: true,
+                            highlightActiveLine: true,
+                            highlightSelectionMatches: true,
+                            closeBracketsKeymap: true,
+                            searchKeymap: true,
+                            foldKeymap: true,
+                            completionKeymap: true,
+                            lintKeymap: true,
+                          }}
                           style={{
+                            fontSize: '14px',
                             fontFamily: "'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace",
-                            tabSize: 2,
-                            letterSpacing: '0.5px'
                           }}
                         />
                       </div>
