@@ -8,6 +8,7 @@ function DiagramView({ tables, dbId }) {
   const [relationships, setRelationships] = useState([])
   const [dragging, setDragging] = useState(null)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [labelPositions, setLabelPositions] = useState({}) // stores t value (0-1) along the curve
 
   useEffect(() => {
     if (dbId) {
@@ -63,7 +64,7 @@ function DiagramView({ tables, dbId }) {
     const pos = tablePositions[tableName]
     const containerRect = containerRef.current.getBoundingClientRect()
     
-    setDragging(tableName)
+    setDragging({ type: 'table', key: tableName })
     setDragOffset({
       x: e.clientX - containerRect.left - pos.x,
       y: e.clientY - containerRect.top - pos.y
@@ -71,30 +72,59 @@ function DiagramView({ tables, dbId }) {
     e.preventDefault()
   }
 
-  const handleMouseMove = (e) => {
-    if (!dragging) return
-    
-    const containerRect = containerRef.current.getBoundingClientRect()
-    const newX = e.clientX - containerRect.left - dragOffset.x
-    const newY = e.clientY - containerRect.top - dragOffset.y
-    
-    setTablePositions(prev => ({
-      ...prev,
-      [dragging]: {
-        x: Math.max(0, newX),
-        y: Math.max(0, newY),
-        width: 240,  // Preserve width
-        height: prev[dragging]?.height || 120  // Preserve height
-      }
-    }))
-  }
-
-  const handleMouseUp = () => {
-    setDragging(null)
-  }
-
   useEffect(() => {
     if (dragging) {
+      const handleMouseMove = (e) => {
+        const rect = containerRef.current.getBoundingClientRect()
+        const x = e.clientX - rect.left - dragOffset.x
+        const y = e.clientY - rect.top - dragOffset.y
+        
+        if (dragging.type === 'table') {
+          setTablePositions(prev => ({
+            ...prev,
+            [dragging.key]: {
+              ...prev[dragging.key],
+              x: Math.max(0, x),
+              y: Math.max(0, y)
+            }
+          }))
+        } else if (dragging.type === 'label') {
+          // Find closest point on the bezier curve
+          const { fromX, fromY, toX, toY, controlX1, controlY1, controlX2, controlY2 } = dragging.lineParams
+          
+          // Find parameter t (0 to 1) that gives closest point on curve to mouse
+          let closestT = 0.5
+          let minDist = Infinity
+          
+          // Sample the curve to find closest point
+          for (let t = 0; t <= 1; t += 0.01) {
+            const curveX = Math.pow(1-t, 3) * fromX + 
+                          3 * Math.pow(1-t, 2) * t * controlX1 + 
+                          3 * (1-t) * Math.pow(t, 2) * controlX2 + 
+                          Math.pow(t, 3) * toX
+            const curveY = Math.pow(1-t, 3) * fromY + 
+                          3 * Math.pow(1-t, 2) * t * controlY1 + 
+                          3 * (1-t) * Math.pow(t, 2) * controlY2 + 
+                          Math.pow(t, 3) * toY
+            
+            const dist = Math.sqrt(Math.pow(x - curveX, 2) + Math.pow(y - curveY, 2))
+            if (dist < minDist) {
+              minDist = dist
+              closestT = t
+            }
+          }
+          
+          setLabelPositions(prev => ({
+            ...prev,
+            [dragging.key]: closestT
+          }))
+        }
+      }
+      
+      const handleMouseUp = () => {
+        setDragging(null)
+      }
+      
       window.addEventListener('mousemove', handleMouseMove)
       window.addEventListener('mouseup', handleMouseUp)
       
@@ -104,6 +134,16 @@ function DiagramView({ tables, dbId }) {
       }
     }
   }, [dragging, dragOffset])
+
+  const handleLabelMouseDown = (e, relKey, lineParams) => {
+    e.stopPropagation()
+    
+    setDragging({ 
+      type: 'label', 
+      key: relKey,
+      lineParams: lineParams // store curve parameters for constraint
+    })
+  }
 
   const drawRelationshipLine = (rel) => {
     const from = tablePositions[rel.fromTable]
@@ -117,52 +157,74 @@ function DiagramView({ tables, dbId }) {
     const toX = to.x + 120      // Center of 240px wide table
     const toY = to.y + 60       // Center of 120px height table
 
-    const midX = (fromX + toX) / 2
-    const midY = (fromY + toY) / 2
-    
     // Control points for curved line
     const controlX1 = fromX + (toX - fromX) * 0.3
     const controlY1 = fromY
     const controlX2 = fromX + (toX - fromX) * 0.7
     const controlY2 = toY
     
+    const relKey = `${rel.fromTable}-${rel.toTable}-${rel.fromColumn}`
+    
     return (
-      <g key={`${rel.fromTable}-${rel.toTable}-${rel.fromColumn}`}>
-        {/* Curved bezier line */}
-        <path
-          d={`M ${fromX} ${fromY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${toX} ${toY}`}
-          stroke="#a78bfa"
-          strokeWidth="3"
-          fill="none"
-          strokeDasharray="8,5"
-          opacity="0.8"
-        />
-        
-        {/* Label background */}
-        <rect
-          x={midX - 70}
-          y={midY - 20}
-          width="140"
-          height="26"
-          fill="#1e1b4b"
-          opacity="0.95"
-          rx="6"
-          stroke="#a78bfa"
-          strokeWidth="1.5"
-        />
-        
-        {/* Label text */}
-        <text
-          x={midX}
-          y={midY - 2}
-          fill="#e9d5ff"
-          fontSize="13"
-          textAnchor="middle"
-          className="font-mono font-bold"
-        >
+      <path
+        key={relKey}
+        d={`M ${fromX} ${fromY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${toX} ${toY}`}
+        stroke="#a78bfa"
+        strokeWidth="3"
+        fill="none"
+        strokeDasharray="8,5"
+        opacity="0.8"
+      />
+    )
+  }
+
+  const renderLabel = (rel) => {
+    const from = tablePositions[rel.fromTable]
+    const to = tablePositions[rel.toTable]
+    
+    if (!from || !to) return null
+
+    const fromX = from.x + 120
+    const fromY = from.y + 60
+    const toX = to.x + 120
+    const toY = to.y + 60
+
+    const controlX1 = fromX + (toX - fromX) * 0.3
+    const controlY1 = fromY
+    const controlX2 = fromX + (toX - fromX) * 0.7
+    const controlY2 = toY
+    
+    const relKey = `${rel.fromTable}-${rel.toTable}-${rel.fromColumn}`
+    const t = labelPositions[relKey] !== undefined ? labelPositions[relKey] : 0.5
+    
+    // Calculate position on bezier curve at parameter t
+    const labelX = Math.pow(1-t, 3) * fromX + 
+                   3 * Math.pow(1-t, 2) * t * controlX1 + 
+                   3 * (1-t) * Math.pow(t, 2) * controlX2 + 
+                   Math.pow(t, 3) * toX
+    const labelY = Math.pow(1-t, 3) * fromY + 
+                   3 * Math.pow(1-t, 2) * t * controlY1 + 
+                   3 * (1-t) * Math.pow(t, 2) * controlY2 + 
+                   Math.pow(t, 3) * toY
+    
+    const lineParams = { fromX, fromY, toX, toY, controlX1, controlY1, controlX2, controlY2 }
+    
+    return (
+      <div
+        key={relKey}
+        className="absolute bg-[#1e1b4b] border-2 border-purple-400 rounded-md px-3 py-1 cursor-move select-none"
+        style={{
+          left: `${labelX - 70}px`,
+          top: `${labelY - 13}px`,
+          zIndex: 10,
+          opacity: 0.95
+        }}
+        onMouseDown={(e) => handleLabelMouseDown(e, relKey, lineParams)}
+      >
+        <span className="text-purple-200 font-mono font-bold text-xs whitespace-nowrap">
           {rel.fromColumn} → {rel.toColumn}
-        </text>
-      </g>
+        </span>
+      </div>
     )
   }
 
@@ -183,17 +245,23 @@ function DiagramView({ tables, dbId }) {
       {/* SVG for relationship lines */}
       {Object.keys(tablePositions).length > 0 && relationships.length > 0 && (
         <svg
-          className="absolute top-0 left-0 pointer-events-none"
+          className="absolute top-0 left-0"
           style={{ 
             zIndex: 1,
             width: '100%',
             height: '100%',
             minWidth: '2000px',
-            minHeight: '1200px'
+            minHeight: '1200px',
+            pointerEvents: 'none'
           }}
         >
           {relationships.map(rel => drawRelationshipLine(rel))}
         </svg>
+      )}
+
+      {/* Relationship Labels */}
+      {Object.keys(tablePositions).length > 0 && relationships.length > 0 && (
+        relationships.map(rel => renderLabel(rel))
       )}
 
       {/* Tables */}
