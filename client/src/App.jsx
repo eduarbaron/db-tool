@@ -313,12 +313,6 @@ function App() {
                           theme={oneDark}
                           extensions={[sql()]}
                           onChange={(value) => setSqlQuery(value)}
-                          placeholder="Escribe tu consulta SQL aquí...
-
-Ejemplos:
-CREATE TABLE usuarios (id INTEGER PRIMARY KEY, nombre TEXT, email TEXT);
-INSERT INTO usuarios (nombre, email) VALUES ('Juan', 'juan@example.com');
-SELECT * FROM usuarios;"
                           basicSetup={{
                             lineNumbers: true,
                             highlightActiveLineGutter: true,
