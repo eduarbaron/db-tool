@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Key, Type, Link2, Move } from 'lucide-react'
 import axios from 'axios'
 
-function DiagramView({ tables, dbId }) {
+function DiagramView({ tables, dbId, apiBase }) {
   const containerRef = useRef(null)
   const [tablePositions, setTablePositions] = useState({})
   const [relationships, setRelationships] = useState([])
@@ -31,7 +31,8 @@ function DiagramView({ tables, dbId }) {
 
   const fetchRelationships = async () => {
     try {
-      const response = await axios.get(`/api/databases/${dbId}/relationships`)
+      const base = apiBase || `/api/databases/${dbId}`
+      const response = await axios.get(`${base}/relationships`)
       setRelationships(response.data)
     } catch (err) {
       console.error('Error fetching relationships:', err)

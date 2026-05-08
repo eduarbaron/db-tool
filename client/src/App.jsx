@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { Database, Play, Trash2, Plus, AlertCircle, CheckCircle, Loader, Code, Wand2, LayoutGrid, Network, Shield } from 'lucide-react'
+import { Database, Play, Trash2, Plus, AlertCircle, CheckCircle, Loader, Code, Wand2, LayoutGrid, Network, Shield, ServerCrash, Plug } from 'lucide-react'
+
 import CodeMirror from '@uiw/react-codemirror'
 import { sql } from '@codemirror/lang-sql'
 import { oneDark } from '@codemirror/theme-one-dark'
@@ -9,6 +10,7 @@ import DDLBuilder from './components/DDLBuilder'
 import DMLBuilder from './components/DMLBuilder'
 import DiagramView from './components/DiagramView'
 import AdminPanel from './components/AdminPanel'
+import PgCredentials from './components/PgCredentials'
 
 const API_URL = '/api'
 
@@ -27,8 +29,20 @@ function App() {
   const [viewMode, setViewMode] = useState('cards')
   const [showAdminPanel, setShowAdminPanel] = useState(false)
 
+  // PostgreSQL mode
+  const [dbMode, setDbMode] = useState('sqlite') // 'sqlite' | 'postgres'
+  const [pgStatus, setPgStatus] = useState(null) // null | { configured, connected, credentials }
+  const [pgTables, setPgTables] = useState([])
+  const [pgSqlQuery, setPgSqlQuery] = useState('')
+  const [pgQueryResult, setPgQueryResult] = useState(null)
+  const [pgLoading, setPgLoading] = useState(false)
+  const [pgError, setPgError] = useState(null)
+  const [pgSuccess, setPgSuccess] = useState(null)
+  const [pgViewMode, setPgViewMode] = useState('sql')
+
   useEffect(() => {
     fetchDatabases()
+    fetchPgStatus()
   }, [])
 
   useEffect(() => {
@@ -36,6 +50,51 @@ function App() {
       fetchTablesWithSchema()
     }
   }, [selectedDb])
+
+  const fetchPgStatus = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/pg/status`)
+      setPgStatus(response.data)
+      if (response.data.connected) {
+        fetchPgTables()
+      }
+    } catch (err) {
+      setPgStatus({ configured: false })
+    }
+  }
+
+  const fetchPgTables = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/pg/tables`)
+      const tablesWithSchema = await Promise.all(
+        response.data.map(async (table) => {
+          const schemaResponse = await axios.get(`${API_URL}/pg/tables/${table.name}/schema`)
+          return { ...table, schema: schemaResponse.data }
+        })
+      )
+      setPgTables(tablesWithSchema)
+    } catch (err) {
+      console.error('Error cargando tablas PostgreSQL:', err)
+    }
+  }
+
+  const executePgQuery = async () => {
+    if (!pgSqlQuery.trim()) return
+    try {
+      setPgLoading(true)
+      setPgError(null)
+      const response = await axios.post(`${API_URL}/pg/execute`, { sql: pgSqlQuery })
+      setPgQueryResult(response.data)
+      setPgSuccess(response.data.message)
+      setTimeout(() => setPgSuccess(null), 3000)
+      setTimeout(fetchPgTables, 150)
+    } catch (err) {
+      setPgError(err.response?.data?.error || 'Error al ejecutar la consulta')
+      setPgQueryResult(null)
+    } finally {
+      setPgLoading(false)
+    }
+  }
 
   const fetchDatabases = async () => {
     try {
@@ -146,18 +205,43 @@ function App() {
               </div>
               <p className="text-purple-200">Herramienta de Base de Datos Online - Ejecuta sentencias DDL y DML</p>
             </div>
-            <button
-              onClick={() => setShowAdminPanel(true)}
-              className="px-4 py-2 bg-slate-700/50 hover:bg-slate-600/50 border border-purple-500/30 text-purple-200 rounded-lg flex items-center gap-2 transition-colors"
-              title="Panel de administración"
-            >
-              <Shield className="w-5 h-5" />
-              Admin
-            </button>
+            <div className="flex items-center gap-3">
+              <div className="flex bg-white/5 border border-white/10 rounded-lg p-1 gap-1">
+                <button
+                  onClick={() => setDbMode('sqlite')}
+                  className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all flex items-center gap-2 ${
+                    dbMode === 'sqlite' ? 'bg-purple-600 text-white' : 'text-purple-300 hover:text-white'
+                  }`}
+                >
+                  <Database className="w-4 h-4" />
+                  SQLite
+                </button>
+                <button
+                  onClick={() => { setDbMode('postgres'); if (pgStatus?.connected) fetchPgTables() }}
+                  className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all flex items-center gap-2 ${
+                    dbMode === 'postgres' ? 'bg-blue-600 text-white' : 'text-purple-300 hover:text-white'
+                  }`}
+                >
+                  <Plug className="w-4 h-4" />
+                  PostgreSQL
+                  {pgStatus?.connected && (
+                    <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
+                  )}
+                </button>
+              </div>
+              <button
+                onClick={() => setShowAdminPanel(true)}
+                className="px-4 py-2 bg-slate-700/50 hover:bg-slate-600/50 border border-purple-500/30 text-purple-200 rounded-lg flex items-center gap-2 transition-colors"
+                title="Panel de administración"
+              >
+                <Shield className="w-5 h-5" />
+                Admin
+              </button>
+            </div>
           </div>
         </header>
 
-        <AdminPanel isOpen={showAdminPanel} onClose={() => setShowAdminPanel(false)} />
+        <AdminPanel isOpen={showAdminPanel} onClose={() => { setShowAdminPanel(false); fetchPgTables() }} />
 
         {error && (
           <div className="mb-4 p-4 bg-red-500/20 border border-red-500 rounded-lg flex items-center gap-2 text-red-200">
@@ -174,7 +258,149 @@ function App() {
           </div>
         )}
 
-        <div className="grid gap-6 grid-cols-1 lg:grid-cols-6">
+        {dbMode === 'postgres' && (
+          <>
+            {pgError && (
+              <div className="mb-4 p-4 bg-red-500/20 border border-red-500 rounded-lg flex items-center gap-2 text-red-200">
+                <AlertCircle className="w-5 h-5" />
+                <span>{pgError}</span>
+                <button onClick={() => setPgError(null)} className="ml-auto text-red-200 hover:text-white">×</button>
+              </div>
+            )}
+            {pgSuccess && (
+              <div className="mb-4 p-4 bg-green-500/20 border border-green-500 rounded-lg flex items-center gap-2 text-green-200">
+                <CheckCircle className="w-5 h-5" />
+                <span>{pgSuccess}</span>
+              </div>
+            )}
+
+            {!pgStatus?.configured ? (
+              <div className="bg-white/10 backdrop-blur-lg rounded-lg p-12 border border-white/20 text-center">
+                <ServerCrash className="w-20 h-20 mx-auto mb-4 text-orange-400 opacity-50" />
+                <h2 className="text-2xl font-semibold text-white mb-2">PostgreSQL no configurado</h2>
+                <p className="text-purple-200 mb-2">Agrega la variable de entorno <code className="bg-black/30 px-2 py-0.5 rounded text-green-300">PG_CONNECTION_URL</code> en el servidor.</p>
+                <p className="text-purple-300 text-sm">Ver <code className="bg-black/30 px-1 rounded">.env.example</code> para el formato.</p>
+              </div>
+            ) : !pgStatus?.connected ? (
+              <div className="bg-white/10 backdrop-blur-lg rounded-lg p-12 border border-white/20 text-center">
+                <ServerCrash className="w-20 h-20 mx-auto mb-4 text-red-400 opacity-50" />
+                <h2 className="text-2xl font-semibold text-white mb-2">Sin conexión a PostgreSQL</h2>
+                <p className="text-purple-200">{pgStatus.error}</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="bg-white/10 backdrop-blur-lg rounded-lg p-6 border border-white/20">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold text-white">Base de datos de clase — PostgreSQL</h2>
+                    <div className="flex gap-2">
+                      {[
+                        { key: 'sql', label: 'SQL', icon: Code },
+                        { key: 'cards', label: 'Tablas', icon: LayoutGrid },
+                        { key: 'diagram', label: 'Diagrama', icon: Network }
+                      ].map(({ key, label, icon: Icon }) => (
+                        <button
+                          key={key}
+                          onClick={() => setPgViewMode(key)}
+                          className={`px-3 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 text-sm ${
+                            pgViewMode === key ? 'bg-blue-600 text-white' : 'bg-white/5 text-purple-200 hover:bg-white/10'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {pgViewMode === 'credentials' && (
+                    <PgCredentials credentials={pgStatus.credentials} />
+                  )}
+
+                  {pgViewMode === 'sql' && (
+                    <div className="space-y-4">
+                      <div className="border-2 border-slate-700 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
+                        <CodeMirror
+                          value={pgSqlQuery}
+                          height="300px"
+                          theme={oneDark}
+                          extensions={[sql()]}
+                          onChange={(value) => setPgSqlQuery(value)}
+                          basicSetup={{
+                            lineNumbers: true,
+                            highlightActiveLineGutter: true,
+                            highlightSpecialChars: true,
+                            foldGutter: true,
+                            drawSelection: true,
+                            dropCursor: true,
+                            allowMultipleSelections: true,
+                            indentOnInput: true,
+                            bracketMatching: true,
+                            closeBrackets: true,
+                            autocompletion: true,
+                            rectangularSelection: true,
+                            crosshairCursor: true,
+                            highlightActiveLine: true,
+                            highlightSelectionMatches: true,
+                          }}
+                          style={{ fontSize: '14px', fontFamily: "'Fira Code', 'Consolas', monospace" }}
+                        />
+                      </div>
+                      <button
+                        onClick={executePgQuery}
+                        disabled={pgLoading || !pgSqlQuery.trim()}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {pgLoading ? (
+                          <><Loader className="w-4 h-4 animate-spin" />Ejecutando...</>
+                        ) : (
+                          <><Play className="w-4 h-4" />Ejecutar SQL</>
+                        )}
+                      </button>
+                      {pgQueryResult && (
+                        <div className="bg-black/20 rounded-lg p-4">
+                          {pgQueryResult.data && pgQueryResult.data.length > 0 ? (
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm text-left">
+                                <thead className="text-xs uppercase bg-blue-900/50 text-blue-200">
+                                  <tr>
+                                    {Object.keys(pgQueryResult.data[0]).map((key) => (
+                                      <th key={key} className="px-4 py-2">{key}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {pgQueryResult.data.map((row, idx) => (
+                                    <tr key={idx} className="border-b border-white/10 hover:bg-white/5 text-purple-100">
+                                      {Object.values(row).map((value, i) => (
+                                        <td key={i} className="px-4 py-2">{value !== null ? String(value) : 'NULL'}</td>
+                                      ))}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <p className="text-purple-200">{pgQueryResult.message}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {pgViewMode === 'cards' && (
+                    <TableVisualizer tables={pgTables} onTableClick={(t) => { setPgSqlQuery(`SELECT * FROM ${t.name}`); setPgViewMode('sql') }} />
+                  )}
+
+                  {pgViewMode === 'diagram' && (
+                    <DiagramView tables={pgTables} dbId="pg" apiBase="/api/pg" />
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        <div className={`grid gap-6 grid-cols-1 lg:grid-cols-6 ${ dbMode === 'postgres' ? 'hidden' : '' }` }>
           <div className="space-y-6 lg:col-span-1">
             <div className="bg-white/10 backdrop-blur-lg rounded-lg p-6 border border-white/20">
               <h2 className="text-xl font-semibold text-white mb-4">Crear base de datos</h2>
@@ -445,3 +671,4 @@ function App() {
 }
 
 export default App
+
